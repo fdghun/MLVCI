@@ -5,3 +5,69 @@ from lazypredict.Supervised import LazyClassifier
 clf = LazyClassifier(verbose=0,ignore_warnings=True, custom_metric=None, random_state=0)
 models,predictions = clf.fit(X_train, X_test, y_train, y_test)
 print(models)
+
+#hyperparameters turning
+#xgb
+param_grid = {
+    "max_depth": [ 3, 4, 5, 7],
+    "learning_rate": [0.1, 0.01, 0.05],
+    "gamma": [0, 0.25, 1, 2, 3, 4, 5],
+    "reg_lambda": [0, 1, 10],
+    "scale_pos_weight": [1, 3, 5],
+    "subsample": [0.8],
+    "colsample_bytree": [ 0.1, 0.5, 0.8, 1]
+    }
+xgb_cl = xgb.XGBClassifier(objective="binary:logistic")
+skf = model_selection.KFold(n_splits=10, shuffle=True, random_state=0)
+grid_cv = GridSearchCV(xgb_cl, param_grid, n_jobs=-1, cv=skf, scoring="roc_auc")
+_ = grid_cv.fit(X_train, y_train)
+grid_cv.best_params_
+#Random forest
+rfn_estimators=range(10,150,10)
+rfmax_depth = range(2,12,2)
+rf_param_grid = {'n_estimators':rfn_estimators,
+                 'max_depth':rfmax_depth,
+                 }
+cvrf = model_selection.KFold(n_splits=10, shuffle=True, random_state=0)  
+grid_cvRF = GridSearchCV(estimator=RandomForestClassifier(random_state=0), 
+                         param_grid=rf_param_grid, n_jobs=-1, cv=cvrf, verbose=True)
+grid_cvRF.fit(X_train, y_train)
+grid_cvRF.best_params_
+#gaussian NB
+gnb = GaussianNB()
+param_grid = {
+    'var_smoothing': [1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1.0]
+}
+grid_searchGNB = GridSearchCV(estimator=gnb, param_grid=param_grid, cv=10, scoring='accuracy')
+grid_searchGNB.fit(X_train, y_train)
+print("Best parameters found: ", grid_searchGNB.best_params_)
+
+#final models
+#final 8-feature RF model
+modelRF = RandomForestClassifier(max_depth=4, n_estimators=120, random_state=0)
+modelRF.fit(X_train, y_train)
+y_pred = modelRF.predict_proba(X_test)[:, 1]
+y_preds = modelRF.predict(X_test)
+fpr, tpr, _ = metrics.roc_curve(y_test, y_pred)
+auc = round(metrics.roc_auc_score(y_test, y_pred), 4)
+plt.plot(fpr,tpr,label="RandomForest, AUC="+str(auc))
+tn, fp, fn, tp = confusion_matrix(y_test, y_preds).ravel()
+specificity = tn / (tn+fp)
+print("ROC RF:",metrics.roc_auc_score(y_test, y_pred))
+print("specificity RF:",specificity)
+print("Accuracy RF:",metrics.accuracy_score(y_test, y_preds))
+print("Precision RF:",metrics.precision_score(y_test, y_preds))
+print("Recall RF:",metrics.recall_score(y_test, y_preds))
+print("F1score RF:",metrics.f1_score(y_test, y_preds))
+print("Ap RF:",metrics.average_precision_score(y_test, y_pred))
+#final 11-feature RF model
+modelRF = RandomForestClassifier(max_depth=4, n_estimators=90, random_state=0)
+modelRF.fit(X_train, y_train)
+y_pred = modelRF.predict_proba(X_test)[:, 1]
+y_preds = modelRF.predict(X_test)
+#final 11-feature GNB model
+gnb = GaussianNB()
+model_GNB = GaussianNB(var_smoothing=1e-09)
+model_GNB.fit(X_train, y_train)
+y_pred = model_GNB.predict_proba(X_test)[:, 1] 
+y_preds = model_GNB.predict(X_test)
